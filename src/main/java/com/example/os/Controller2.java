@@ -46,6 +46,7 @@ public class Controller2 {
     private Stage stage;
     private Scene scene;
     private Parent root;
+    private boolean valid = true;
 
     private ArrayList<Process> processes3;
 
@@ -76,56 +77,78 @@ public class Controller2 {
             container.getChildren().add(hBox1);
         }
     }
+    private boolean isNumeric(String text){
+        try {
+            int num = Integer.parseInt(text);
+            return true;
+        }catch (Exception e) {
+            return false;
+        }
+    }
 
     public void simulation() {
-        container.getChildren().clear();
         PriorityScheduler scheduler = new PriorityScheduler();
+        boolean valid = true; // Initialize valid flag outside the loop
         for (int i = 0; i < this.numberOfProcesses; i++) {
-            scheduler.addProcess(new Process(i + 1, Integer.parseInt(this.arrivalTime[i].getText()), Integer.parseInt(this.burstTime[i].getText()), Integer.parseInt(this.priority[i].getText())));
+            String arrivalTime = this.arrivalTime[i].getText();
+            String burstTime = this.burstTime[i].getText();
+            String priority = this.priority[i].getText();
+            if (arrivalTime.isEmpty() || burstTime.isEmpty() || priority.isEmpty() ||
+                    !arrivalTime.matches("\\d+") || !burstTime.matches("\\d+") || !priority.matches("\\d+")) {
+                numberLabel.setText("Please, Enter valid data :D");
+                valid = false;
+                break; // Break out of the loop if any input is invalid
+            } else {
+                scheduler.addProcess(new Process(i + 1, Integer.parseInt(arrivalTime), Integer.parseInt(burstTime), Integer.parseInt(priority)));
+            }
         }
 
-        scheduler.runScheduler();
-        for (Process process : scheduler.processes2) {
-            process.calculateTurnaroundTime();
-            process.calculateWaitingTime();
-            process.calculateResponseTime();
+        if (valid) {
+            container.getChildren().clear();
+            scheduler.runScheduler();
+            for (Process process : scheduler.processes2) {
+                process.calculateTurnaroundTime();
+                process.calculateWaitingTime();
+                process.calculateResponseTime();
+                HBox hbox2 = new HBox(10);
+                hbox2.getChildren().addAll(
+                        new Label("process" +process.getProcessId()+":"),
+                        new Label("Waiting Time: "+process.getWaitingTime()), // Fixed typo in label text
+                        new Label("Response Time: "+process.getResponseTime()),
+                        new Label("TurnAround Time: "+process.getTurnaroundTime())
+                );
+                hbox2.setPadding(new Insets(15));
+                container.getChildren().add(hbox2);
+            }
+            int numCompletedProcesses = this.numberOfProcesses - scheduler.processes.size();
+            double avgTurnaroundTime = scheduler.totalTurnaroundTime / numCompletedProcesses;
+            double avgWaitingTime = scheduler.totalWaitingTime / numCompletedProcesses;
+            double avgResponseTime = scheduler.totalResponseTime / numCompletedProcesses;
+            this.processes3 = scheduler.processes3;
+
             HBox hbox2 = new HBox(10);
             hbox2.getChildren().addAll(
-                    new Label("process" +process.getProcessId()+":"),
-                    new Label("Waitaing Time: "+process.getWaitingTime()),
-                    new Label("Response Time: "+process.getResponseTime()),
-                    new Label("TurnAround Time: "+process.getTurnaroundTime())
+                    new Label("Average Turnaround Time: " + avgTurnaroundTime),
+                    new Label("Average Waiting Time: " + avgWaitingTime),
+                    new Label("Average Response Time: " + avgResponseTime)
             );
             hbox2.setPadding(new Insets(15));
             container.getChildren().add(hbox2);
-        }
-        int numCompletedProcesses = this.numberOfProcesses - scheduler.processes.size();
-        double avgTurnaroundTime = scheduler.totalTurnaroundTime / numCompletedProcesses;
-        double avgWaitingTime = scheduler.totalWaitingTime / numCompletedProcesses;
-        double avgResponseTime = scheduler.totalResponseTime / numCompletedProcesses;
-        this.processes3 = scheduler.processes3;
-
-        HBox hbox2 = new HBox(10);
-        hbox2.getChildren().addAll(
-                new Label("Average Turnaround Time: " + avgTurnaroundTime),
-                new Label("Average Waiting Time: " + avgWaitingTime),
-                new Label("Average Response Time: " + avgResponseTime)
-        );
-        hbox2.setPadding(new Insets(15));
-        container.getChildren().add(hbox2);
-        Button b = new Button("Show Gantt Chart");
-        b.setOnAction(new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent event) {
-                try {
-                    showGanttchart(event);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+            Button b = new Button("Show Gantt Chart");
+            b.setOnAction(new EventHandler<ActionEvent>() {
+                @Override
+                public void handle(ActionEvent event) {
+                    try {
+                        showGanttchart(event);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
-            }
-        });
-        container.getChildren().add(b);
+            });
+            container.getChildren().add(b);
+        }
     }
+
 
     public void showGanttchart(ActionEvent event) throws IOException {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("Ganttchart.fxml"));
@@ -156,19 +179,13 @@ public class Controller2 {
         chart.setBlockHeight(50);
 
         XYChart.Series[] series = new XYChart.Series[this.processes3.size()];
-        String[] colors = {
-                "red", "green", "blue", "yellow", "orange",
-                "purple", "pink", "cyan", "magenta", "lime",
-                "teal", "indigo", "violet", "brown", "gray"
-        };
         for (int y = 0; y < this.processes3.size(); y++) {
             series[y] = new XYChart.Series();
-            int colorIndex = y % colors.length; // Use modulo operator to cycle through colors array
             String machine = "Processes" + this.processes3.get(y).getProcessId();
             series[y].getData().add(new XYChart.Data(
                     this.processes3.get(y).getStartTime(),
                     machine,
-                    new ExtraData(this.processes3.get(y).getEndTime() - this.processes3.get(y).getStartTime(), ("status-" + colors[0]))
+                    new ExtraData(this.processes3.get(y).getEndTime() - this.processes3.get(y).getStartTime(), "status-red")
             ));
             chart.getData().addAll(series[y]);
         }
